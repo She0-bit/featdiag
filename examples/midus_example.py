@@ -241,38 +241,61 @@ if __name__ == "__main__":
 
         rng = np.random.RandomState(42)
         n = 800
-        pil   = rng.randn(n)
-        bmi   = 25 + 4 * rng.randn(n)
-        age   = 55 + 10 * rng.randn(n)
-        smoke = (rng.random(n) < 0.25).astype(float)
-        phys  = rng.randn(n)
-        sleep = 7 + rng.randn(n)
-        educ  = rng.randint(1, 6, n).astype(float)
-        income = rng.randn(n)
-        female = (rng.random(n) < 0.52).astype(float)
+        pil       = rng.randn(n)
+        # pil_proxy: correlated substitute (r≈0.96) — mimics neg_affect in the
+        # real MIDUS data. Included in XGBoost/SHAP but excluded from the
+        # logistic OR so PIL's independent association remains visible.
+        pil_proxy = pil + 0.3 * rng.randn(n)
+        bmi       = 25 + 4 * rng.randn(n)
+        age       = 55 + 10 * rng.randn(n)
+        smoke     = (rng.random(n) < 0.25).astype(float)
+        phys      = rng.randn(n)
+        sleep_h   = 7 + rng.randn(n)
+        educ      = rng.randint(1, 6, n).astype(float)
+        income    = rng.randn(n)
+        female    = (rng.random(n) < 0.52).astype(float)
 
-        # CVD: PIL is a genuine predictor masked by BMI/age (substitution scenario)
-        logit_cvd = -0.4 * pil + 0.5 * bmi / 4 + 0.3 * age / 10 + 0.4 * smoke
+        # Centre bmi and age so the intercept controls the event rate directly.
+        bmi_z = (bmi - 25) / 4
+        age_z = (age - 55) / 10
+
+        # CVD: PIL has a true negative association; pil_proxy (r≈0.96) absorbs
+        # PIL's predictive signal during ablation → ΔAUC stays below threshold.
+        # Intercept −1.5 targets ~20% prevalence.
+        logit_cvd = (-1.5
+                     - 0.4 * pil - 0.3 * pil_proxy
+                     + 0.3 * bmi_z + 0.2 * age_z + 0.4 * smoke)
         y_cvd = (rng.random(n) < 1 / (1 + np.exp(-logit_cvd))).astype(int)
 
-        # CRP: PIL has no real association (redundant scenario)
-        logit_crp = 0.4 * bmi / 4 + 0.2 * smoke + 0.01 * pil
+        # CRP: PIL has no real association — intercept −0.8 targets ~30%.
+        logit_crp = -0.8 + 0.5 * bmi_z + 0.3 * smoke
         y_crp = (rng.random(n) < 1 / (1 + np.exp(-logit_crp))).astype(int)
 
         X = pd.DataFrame({
-            "pil": pil, "age": age, "bmi": bmi, "smoke": smoke,
-            "phys_act": phys, "sleep": sleep, "educ": educ,
-            "income": income, "female": female,
+            "pil": pil, "pil_proxy": pil_proxy, "age": age, "bmi": bmi,
+            "smoke": smoke, "phys_act": phys, "sleep": sleep_h,
+            "educ": educ, "income": income, "female": female,
         })
 
-        print("[Demo] Case Study 1 — PIL → CVD (expect SUBSTITUTION or INDEPENDENT)")
-        fw1 = DiagnosticFramework(X, y_cvd, feature="pil", outcome="CVD_demo")
+        # Exclude pil_proxy from logistic OR: it is a substitute feature, not an
+        # independent confounder — adjusting for it would attenuate PIL's OR and
+        # produce a spuriously REDUNDANT classification (same logic as neg_affect).
+        LR_DEMO = ["pil", "age", "bmi", "smoke", "phys_act",
+                   "sleep", "educ", "income", "female"]
+
+        print(f"[Demo] CVD events: {y_cvd.sum()}/{n} ({y_cvd.mean()*100:.1f}%)")
+        print(f"[Demo] CRP events: {y_crp.sum()}/{n} ({y_crp.mean()*100:.1f}%)\n")
+
+        print("[Demo] Case Study 1 — PIL → CVD (expect SUBSTITUTION)")
+        fw1 = DiagnosticFramework(X, y_cvd, feature="pil", outcome="CVD_demo",
+                                  lr_features=LR_DEMO)
         r1 = fw1.fit(run_lime=False, verbose=True)
         r1.summary()
         r1.save_plot(str(OUT / "demo_cvd_result.png"))
 
         print("\n[Demo] Case Study 2 — PIL → CRP>3 (expect REDUNDANT)")
-        fw2 = DiagnosticFramework(X, y_crp, feature="pil", outcome="CRP_demo")
+        fw2 = DiagnosticFramework(X, y_crp, feature="pil", outcome="CRP_demo",
+                                  lr_features=LR_DEMO)
         r2 = fw2.fit(run_lime=False, verbose=True)
         r2.summary()
         r2.save_plot(str(OUT / "demo_crp_result.png"))
