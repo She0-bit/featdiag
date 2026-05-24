@@ -163,6 +163,15 @@ If you use `featdiag`, please cite:
   note    = {Submitted},
   url     = {https://github.com/She0-bit/featdiag}
 }
+
+@software{alotaibi2026featdiag_software,
+  author    = {Alotaibi, Sheikah Adel},
+  title     = {featdiag v0.1.0},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.20366169},
+  url       = {https://doi.org/10.5281/zenodo.20366169}
+}
 ```
 
 ## License
