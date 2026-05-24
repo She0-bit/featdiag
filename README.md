@@ -40,6 +40,32 @@ result.plot()      # return matplotlib Figure
 result.to_dict()   # JSON-serialisable metrics dict
 ```
 
+### When your feature set includes a mediator
+
+If X contains a variable that is a *mediator* (not a confounder) on the
+feature→outcome pathway, include it in X for XGBoost/SHAP but exclude it
+from the logistic regression using `lr_features`. Otherwise the logistic OR
+will be attenuated and the classification will be wrong.
+
+In this paper, `neg_affect` is a mediator on PIL→CVD, so:
+
+```python
+# All 9 features go into XGBoost and SHAP
+# Only the 8 confounders (no neg_affect) go into the logistic OR
+fw = DiagnosticFramework(
+    X, y,
+    feature="pil",
+    outcome="CVD",
+    lr_features=["pil", "age", "bmi", "smoke", "phys_act",
+                 "sleep", "educ", "income", "female"],
+)
+result = fw.fit()
+```
+
+If you are not sure whether a variable is a mediator, include it in both
+(default behaviour: `lr_features=None`). The classification will be
+conservative — if anything, it will undercount SUBSTITUTION cases.
+
 ## Parameters
 
 ### `DiagnosticFramework(X, y, feature, ...)`
@@ -56,6 +82,7 @@ result.to_dict()   # JSON-serialisable metrics dict
 | `threshold` | `float` | `0.015` | ΔAUC cutoff (INDEPENDENT vs. SUBSTITUTION) |
 | `random_state` | `int` | `42` | Global seed |
 | `alpha` | `float` | `0.05` | Significance level for OR |
+| `lr_features` | `list` or `None` | `None` | Features used in logistic OR (default: all X columns). Use to exclude mediators from the OR while keeping them in XGBoost/SHAP. |
 
 ### `fw.fit(run_lime=False, lime_seeds=10, lime_samples=300, store_shap=True, verbose=True)`
 

@@ -27,6 +27,18 @@ The script will print a summary and save:
   midus_cvd_result.png
   hrs_result.png         (requires HRS data)
   biomarker_result.png   (requires Biomarker data)
+
+Important note on lr_features
+------------------------------
+The XGBoost model and SHAP rankings use all 9 features (including neg_affect).
+However, the logistic OR that drives the diagnostic rule uses lr_features — a
+subset that excludes neg_affect. This is because neg_affect is a *mediator* on
+the PIL→CVD pathway (PIL→neg_affect→CVD): including it in the logistic model
+would attenuate PIL's total effect and produce a spuriously non-significant OR.
+The lr_features parameter controls this separation. Without it, the classification
+for PIL→CVD would incorrectly return REDUNDANT instead of SUBSTITUTION.
+
+See paper §2.4 (Logistic regression) for the methodological rationale.
 """
 
 from __future__ import annotations
@@ -53,14 +65,20 @@ def _load_midus2_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     Extract the 9-feature set from a cleaned MIDUS 2 main-file DataFrame.
 
     Expected columns (post-harmonisation):
-        pil, age, bmi, smoke, phys_act, sleep, educ, income, female
+        pil, neg_affect, age, bmi, smoke, phys_act, sleep, educ, income, female
         cvd_event   (binary outcome, cardiovascular event)
     """
-    features = ["pil", "age", "bmi", "smoke", "phys_act", "sleep", "educ", "income", "female"]
+    features = ["pil", "neg_affect", "age", "bmi", "smoke",
+                "phys_act", "sleep", "educ", "income", "female"]
     outcome = "cvd_event"
     keep = features + [outcome]
     sub = df[keep].dropna()
     return sub[features], sub[outcome].astype(int)
+
+# neg_affect is excluded from the logistic OR because it is a mediator on the
+# PIL→CVD pathway. It is included in XGBoost/SHAP for better prediction only.
+LR_FEATURES_CVD = ["pil", "age", "bmi", "smoke", "phys_act",
+                   "sleep", "educ", "income", "female"]
 
 
 # ── Case Study 1: MIDUS 2 — PIL → CVD ─────────────────────────────────────────
@@ -75,7 +93,9 @@ def run_midus_cvd(df_midus2: pd.DataFrame):
     print(f"n={len(y)}, events={y.sum()} ({y.mean()*100:.1f}%)")
     print(f"{'='*60}")
 
-    fw = DiagnosticFramework(X, y, feature="pil", outcome="CVD", threshold=0.015)
+    # lr_features excludes neg_affect (mediator) from logistic OR — paper Model A
+    fw = DiagnosticFramework(X, y, feature="pil", outcome="CVD",
+                             threshold=0.015, lr_features=LR_FEATURES_CVD)
     result = fw.fit(run_lime=False, verbose=True)
     result.summary()
     result.save_plot(str(OUT / "midus_cvd_result.png"))
@@ -102,7 +122,10 @@ def run_hrs(df_hrs: pd.DataFrame):
     """
     from featdiag import DiagnosticFramework
 
-    features = ["pil", "age", "bmi", "smoke", "phys_act", "sleep", "educ", "income", "female"]
+    features = ["pil", "neg_affect", "age", "bmi", "smoke",
+                "phys_act", "sleep", "educ", "income", "female"]
+    lr_feats  = ["pil", "age", "bmi", "smoke", "phys_act",
+                 "sleep", "educ", "income", "female"]
     sub = df_hrs[features + ["incident_cvd"]].dropna()
     X, y = sub[features], sub["incident_cvd"].astype(int)
 
@@ -111,7 +134,9 @@ def run_hrs(df_hrs: pd.DataFrame):
     print(f"n={len(y)}, events={y.sum()} ({y.mean()*100:.1f}%)")
     print(f"{'='*60}")
 
-    fw = DiagnosticFramework(X, y, feature="pil", outcome="incident_CVD", threshold=0.015)
+    # lr_features excludes neg_affect (mediator) — same rationale as MIDUS
+    fw = DiagnosticFramework(X, y, feature="pil", outcome="incident_CVD",
+                             threshold=0.015, lr_features=lr_feats)
     result = fw.fit(run_lime=False, verbose=True)
     result.summary()
     result.save_plot(str(OUT / "hrs_result.png"))
