@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+featdiag/__init__.py
+featdiag/core.py
+featdiag/metrics.py
+featdiag/plot.py
+featdiag/rules.py
+featdiag.egg-info/PKG-INFO
+featdiag.egg-info/SOURCES.txt
+featdiag.egg-info/dependency_links.txt
+featdiag.egg-info/requires.txt
+featdiag.egg-info/top_level.txt
+tests/test_core.py

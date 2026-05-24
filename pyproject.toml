@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "featdiag"
+version = "0.1.0"
+description = "Three-metric diagnostic framework for feature substitution in clinical ML"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Sheikah Adel Alotaibi", email = "shekah.adel.b@gmail.com" }]
+keywords = ["machine learning", "SHAP", "XGBoost", "interpretability", "clinical AI", "feature selection"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=1.5",
+    "scikit-learn>=1.2",
+    "xgboost>=1.7",
+    "shap>=0.42",
+    "statsmodels>=0.14",
+    "matplotlib>=3.6",
+]
+
+[project.optional-dependencies]
+lime = ["lime>=0.2"]
+dev  = ["pytest>=7", "pytest-cov", "lime>=0.2"]
+
+[project.urls]
+Homepage   = "https://github.com/She0-bit/featdiag"
+Repository = "https://github.com/She0-bit/featdiag"
+Paper      = "https://doi.org/10.1038/s41746-2026-xxxxx"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["featdiag*"]
