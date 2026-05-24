@@ -184,6 +184,11 @@ class DiagnosticFramework:
         Global random seed. Default 42.
     alpha : float
         Significance level for logistic regression OR. Default 0.05.
+    lr_features : list of str, optional
+        Subset of X columns to use in the logistic regression. Useful when X
+        contains mediators that should be excluded from the OR model (e.g.,
+        negative affect when diagnosing a distal predictor like PIL). Must
+        include `feature`. Default None → all columns in X.
 
     Examples
     --------
@@ -206,6 +211,7 @@ class DiagnosticFramework:
         threshold: float = 0.015,
         random_state: int = 42,
         alpha: float = 0.05,
+        lr_features: Optional[List[str]] = None,
     ):
         if model_class is None:
             try:
@@ -217,6 +223,13 @@ class DiagnosticFramework:
         if feature not in X.columns:
             raise ValueError(f"Feature '{feature}' not found in X.columns: {list(X.columns)}")
 
+        if lr_features is not None:
+            missing = [f for f in lr_features if f not in X.columns]
+            if missing:
+                raise ValueError(f"lr_features not in X.columns: {missing}")
+            if feature not in lr_features:
+                raise ValueError(f"feature '{feature}' must be included in lr_features")
+
         self.X = X.copy().reset_index(drop=True)
         self.y = np.asarray(y)
         self.feature = feature
@@ -226,6 +239,7 @@ class DiagnosticFramework:
         self.cv = cv
         self.threshold = threshold
         self.alpha = alpha
+        self.lr_features = lr_features  # None → use all X columns
 
         # Auto-set scale_pos_weight for XGBoost if not provided
         if model_params is None:
@@ -337,7 +351,8 @@ class DiagnosticFramework:
         # Step 5: Logistic regression OR
         if verbose:
             print(f"[5/5] Fitting logistic regression...")
-        lr_out = compute_logistic_or(self.X, self.y, self.feature, alpha=self.alpha)
+        X_lr = self.X[self.lr_features] if self.lr_features else self.X
+        lr_out = compute_logistic_or(X_lr, self.y, self.feature, alpha=self.alpha)
         result.or_value = lr_out["or_value"]
         result.or_ci_lower = lr_out["ci_lower"]
         result.or_ci_upper = lr_out["ci_upper"]
